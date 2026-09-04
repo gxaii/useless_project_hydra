@@ -2639,37 +2639,31 @@
             simState = 'slipping';
             playSound(analysis.sound || 'slip');
 
-            // Unique launch kinematics per floor
+            // Unique slip kinematics per floor (stay on the surface — no hop / bounce)
             if (floorId === 'marble') {
               runnerVx = analysis.launchVelocity * 0.55;
-              runnerVy = -8.5; // high backflip airtime
-              spinRate = 0.28;
+              spinRate = 0.055;
               addParticles('gleam', runnerX, floorY, 14);
             } else if (floorId === 'gravel') {
               runnerVx = analysis.launchVelocity * 0.42;
-              runnerVy = -4.0; // low forward stumble
-              spinRate = 0.38; // clumsy forward cartwheel
+              spinRate = 0.08;
               addParticles('rocks', runnerX, floorY, 18);
               addParticles('dust', runnerX, floorY, 8);
             } else if (floorId === 'ice') {
               runnerVx = analysis.launchVelocity * 0.65;
-              runnerVy = -6.5;
-              spinRate = 0.35; // helicopter spin
+              spinRate = 0.05;
               addParticles('snow', runnerX, floorY, 20);
             } else if (floorId === 'wettile') {
               runnerVx = analysis.launchVelocity * 0.58;
-              runnerVy = -9.2; // rocket leap into belly-flop
-              spinRate = 0.16;
+              spinRate = 0.048;
               addParticles('water', runnerX, floorY, 24);
             } else if (floorId === 'hardwood') {
               runnerVx = analysis.launchVelocity * 0.48;
-              runnerVy = -7.5;
-              spinRate = 0.22;
+              spinRate = 0.06;
               addParticles('sparks', runnerX, floorY, 8);
             } else if (floorId === 'asphalt') {
               runnerVx = analysis.launchVelocity * 0.46;
-              runnerVy = -5.0; // low diving trip
-              spinRate = 0.24;
+              spinRate = 0.07;
               addParticles('sparks', runnerX, floorY, 16);
               addParticles('smoke', runnerX, floorY, 6);
             }
@@ -2677,15 +2671,18 @@
 
         } else if (simState === 'slipping') {
           runnerX += runnerVx;
-          runnerY += runnerVy;
-          runnerVy += 0.48; // gravity
-          runnerAngle += spinRate;
+          const groundedY = floorY - 26;
+          const fallAngle = Math.PI * 0.5;
+          runnerY += (groundedY - runnerY) * 0.11;
+          if (runnerY > groundedY) runnerY = groundedY;
+          runnerAngle += (fallAngle - runnerAngle) * spinRate;
+          if (runnerAngle > fallAngle) runnerAngle = fallAngle;
 
-          elSimHud.textContent = `[${analysis.floorName.toUpperCase()}] LAUNCH VELOCITY: ${analysis.velocityKmh} km/h (${analysis.launchVelocity} m/s) | AIRTIME!`;
+          elSimHud.textContent = `[${analysis.floorName.toUpperCase()}] LAUNCH VELOCITY: ${analysis.velocityKmh} km/h (${analysis.launchVelocity} m/s) | SLIPPING`;
 
-          // Hit ground
-          if (runnerY >= floorY - 26) {
-            runnerY = floorY - 26;
+          // Settled onto the floor after the slip (no bounce)
+          if (runnerY >= groundedY - 0.6 && runnerAngle >= fallAngle - 0.1) {
+            runnerY = groundedY;
             simState = 'sliding';
             playSound('thud');
 
