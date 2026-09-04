@@ -1,1 +1,3325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍌 Banana Slip Dynamics & Lethality Laboratory</title>
+  
+  <!-- TensorFlow.js & MobileNet for Real-Time Banana Classification -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-card: rgba(18, 26, 43, 0.75);
+      --bg-card-hover: rgba(28, 38, 62, 0.85);
+      --border-color: rgba(250, 204, 21, 0.18);
+      --border-glow: rgba(250, 204, 21, 0.45);
+      --banana-yellow: #facc15;
+      --banana-gold: #eab308;
+      --banana-amber: #d97706;
+      --banana-green: #22c55e;
+      --banana-brown: #78350f;
+      --accent-cyan: #06b6d4;
+      --danger-red: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.35);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(250, 204, 21, 0.07) 0%, transparent 40%),
+        radial-gradient(circle at 85% 75%, rgba(6, 182, 212, 0.05) 0%, transparent 40%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+      color: var(--text-main);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding-bottom: 60px;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(250, 204, 21, 0.3);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--banana-yellow);
+    }
+
+    /* Top Navigation Bar */
+    header {
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 14px 24px;
+    }
+
+    .nav-container {
+      max-width: 1300px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+    }
+
+    .brand-icon {
+      font-size: 2rem;
+      filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.6));
+      animation: gentle-wobble 3s infinite ease-in-out;
+    }
+
+    @keyframes gentle-wobble {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-8deg); }
+      75% { transform: rotate(8deg); }
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fef08a 0%, #facc15 50%, #eab308 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #4ade80;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 9999px;
+    }
+
+    .badge-status.loading {
+      background: rgba(234, 179, 8, 0.12);
+      border-color: rgba(234, 179, 8, 0.3);
+      color: #fde047;
+    }
+
+    .badge-status.error {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #f87171;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    .sound-toggle-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sound-toggle-btn:hover {
+      background: rgba(250, 204, 21, 0.15);
+      border-color: var(--banana-yellow);
+    }
+
+    /* Main Container Layout */
+    .app-layout {
+      max-width: 1300px;
+      margin: 24px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 1024px) {
+      .app-layout {
+        grid-template-columns: 480px 1fr;
+        align-items: start;
+      }
+    }
+
+    /* Glass Panels */
+    .panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+    }
+
+    .panel-tag {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--banana-yellow);
+      background: rgba(250, 204, 21, 0.1);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(250, 204, 21, 0.25);
+    }
+
+    /* Input Tabs */
+    .input-tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--banana-yellow);
+      color: #090d16;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(250, 204, 21, 0.3);
+    }
+
+    /* Dropzone */
+    .dropzone {
+      border: 2px dashed rgba(250, 204, 21, 0.35);
+      border-radius: 16px;
+      padding: 30px 16px;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(250, 204, 21, 0.02);
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--banana-yellow);
+      background: rgba(250, 204, 21, 0.08);
+      transform: scale(1.01);
+      box-shadow: 0 0 20px rgba(250, 204, 21, 0.15);
+    }
+
+    .dropzone-icon {
+      font-size: 3rem;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 4px 10px rgba(250, 204, 21, 0.3));
+    }
+
+    .dropzone-text {
+      font-size: 0.95rem;
+      color: var(--text-main);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .dropzone-hint {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Camera Viewfinder */
+    .camera-container {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      position: relative;
+    }
+
+    .video-wrapper {
+      width: 100%;
+      height: 260px;
+      background: #000;
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid rgba(250, 204, 21, 0.3);
+    }
+
+    #webcam-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .scanner-reticle {
+      position: absolute;
+      inset: 20px;
+      border: 2px solid rgba(250, 204, 21, 0.6);
+      border-radius: 12px;
+      pointer-events: none;
+      box-shadow: 0 0 15px rgba(250, 204, 21, 0.2) inset;
+    }
+
+    .scanner-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--banana-yellow), transparent);
+      box-shadow: 0 0 8px var(--banana-yellow);
+      animation: scan-vertical 2.2s infinite ease-in-out;
+    }
+
+    @keyframes scan-vertical {
+      0% { top: 10%; opacity: 0.2; }
+      50% { top: 85%; opacity: 1; }
+      100% { top: 10%; opacity: 0.2; }
+    }
+
+    .cam-controls {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-family: var(--font-main);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+      color: #090d16;
+      box-shadow: 0 4px 14px rgba(234, 179, 8, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #fef08a 0%, #facc15 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(234, 179, 8, 0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    /* Preset Test Bananas */
+    .presets-section {
+      margin-top: 18px;
+    }
+
+    .presets-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-family: var(--font-mono);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .preset-chip {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 4px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .preset-chip:hover {
+      border-color: var(--banana-yellow);
+      background: rgba(250, 204, 21, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .preset-chip.bad-preset {
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .preset-chip.bad-preset:hover {
+      border-color: var(--danger-red);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .preset-emoji {
+      font-size: 1.4rem;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .preset-name {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Preview Canvas Area */
+    .preview-box {
+      margin-top: 18px;
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #06090e;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #preview-canvas {
+      max-width: 100%;
+      max-height: 250px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .scan-status-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 10;
+    }
+
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 4px solid rgba(250, 204, 21, 0.2);
+      border-top-color: var(--banana-yellow);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* REJECTION ALERT MODAL / BANNER */
+    .rejection-banner {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 12px;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    .rejection-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #f87171;
+      font-weight: 800;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+
+    .rejection-body {
+      font-size: 0.82rem;
+      color: #fca5a5;
+      line-height: 1.4;
+    }
+
+    .detected-tag {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      color: #fff;
+    }
+
+    /* RESULTS DASHBOARD */
+    .results-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* FLOOR MATERIAL SELECTOR */
+    .floor-selector-box {
+      background: rgba(8, 14, 26, 0.7);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .floor-selector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .floor-selector-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-family: var(--font-mono);
+    }
+
+    .floor-indicator-badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(250, 204, 21, 0.15);
+      border: 1px solid rgba(250, 204, 21, 0.35);
+      color: var(--banana-yellow);
+      font-weight: 700;
+    }
+
+    .floor-selector-subtitle {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      line-height: 1.35;
+    }
+
+    .floor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .floor-chip {
+      background: rgba(18, 26, 43, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      color: var(--text-main);
+      position: relative;
+      outline: none;
+    }
+
+    .floor-chip:hover {
+      background: rgba(250, 204, 21, 0.08);
+      border-color: rgba(250, 204, 21, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .floor-chip.active {
+      background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(234, 179, 8, 0.08) 100%);
+      border-color: var(--banana-yellow);
+      box-shadow: 0 0 16px rgba(250, 204, 21, 0.25), inset 0 0 12px rgba(250, 204, 21, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .floor-chip.active::after {
+      content: 'ACTIVE';
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 0.58rem;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      color: var(--banana-yellow);
+      letter-spacing: 0.5px;
+    }
+
+    .floor-icon {
+      font-size: 1.6rem;
+      line-height: 1;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+      transition: transform 0.2s ease;
+    }
+
+    .floor-chip:hover .floor-icon, .floor-chip.active .floor-icon {
+      transform: scale(1.12);
+    }
+
+    .floor-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    .floor-badge {
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .floor-chip.active .floor-badge {
+      color: var(--banana-yellow);
+      border-color: rgba(250, 204, 21, 0.3);
+    }
+
+    /* Main Metric Cards Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .metric-card {
+      background: rgba(12, 19, 33, 0.7);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-glow);
+    }
+
+    .metric-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--banana-yellow);
+    }
+
+    .metric-card.danger::after {
+      background: var(--danger-red);
+    }
+
+    .metric-card.cyan::after {
+      background: var(--accent-cyan);
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .metric-value-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .metric-big {
+      font-size: 2.3rem;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: #fff;
+      font-family: var(--font-mono);
+    }
+
+    .metric-unit {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .metric-detail {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+
+    /* Slippery Percentage Progress Ring / Bar */
+    .slip-gauge-box {
+      margin-top: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      height: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slip-gauge-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e 0%, #facc15 50%, #ef4444 100%);
+      transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border-radius: 8px;
+    }
+
+    /* Lethality Alert Card */
+    .lethality-banner {
+      border-radius: 16px;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      position: relative;
+    }
+
+    .lethality-icon {
+      font-size: 2.5rem;
+      animation: pulse-danger 1.8s infinite ease-in-out;
+    }
+
+    @keyframes pulse-danger {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.4)); }
+      50% { transform: scale(1.12); filter: drop-shadow(0 0 14px rgba(239, 68, 68, 0.8)); }
+    }
+
+    .lethality-content {
+      flex: 1;
+    }
+
+    .lethality-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .lethality-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .lethality-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* SIMULATION CANVAS SECTION */
+    .sim-section {
+      background: rgba(12, 19, 33, 0.75);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .sim-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .sim-canvas-wrapper {
+      width: 100%;
+      height: 210px;
+      background: #06090e;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+    }
+
+    #sim-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .sim-overlay-hud {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    /* Save to Leaderboard Form */
+    .save-form {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .save-input {
+      flex: 1;
+      min-width: 200px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-family: var(--font-main);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .save-input:focus {
+      border-color: var(--banana-yellow);
+      box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+    }
+
+    /* LEADERBOARD SECTION */
+    .leaderboard-section {
+      margin-top: 28px;
+      grid-column: 1 / -1;
+    }
+
+    .leaderboard-table-wrapper {
+      overflow-x: auto;
+      margin-top: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(12, 19, 33, 0.6);
+    }
+
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    .leaderboard-table th {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .leaderboard-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
+    }
+
+    .leaderboard-table tr:hover td {
+      background: rgba(250, 204, 21, 0.03);
+    }
+
+    .rank-cell {
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 1.1rem;
+      width: 60px;
+    }
+
+    .rank-1 { color: #facc15; text-shadow: 0 0 10px rgba(250, 204, 21, 0.6); }
+    .rank-2 { color: #e2e8f0; }
+    .rank-3 { color: #d97706; }
+
+    .banana-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #000;
+      border: 1px solid rgba(250, 204, 21, 0.3);
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 10px;
+    }
+
+    .banana-name-cell {
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .banana-date {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      display: block;
+      margin-top: 2px;
+    }
+
+    .slip-pill {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: rgba(250, 204, 21, 0.12);
+      color: var(--banana-yellow);
+      border: 1px solid rgba(250, 204, 21, 0.3);
+    }
+
+    .floor-tag-small {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+
+    .lethality-tag-small {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+    }
+
+    .tag-mild { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .tag-moderate { background: rgba(234, 179, 8, 0.15); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.3); }
+    .tag-high { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
+    .tag-deadly { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); }
+
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .delete-btn:hover {
+      color: var(--danger-red);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    /* Science & Trivia Modal/Footer */
+    .lab-footer {
+      max-width: 1300px;
+      margin: 40px auto 0;
+      padding: 20px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .lab-footer a {
+      color: var(--banana-yellow);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header>
+    <div class="nav-container">
+      <div class="brand">
+        <span class="brand-icon">🍌</span>
+        <div>
+          <div class="brand-title">SLIP-O-METER LABS™</div>
+          <div class="brand-subtitle">Banana Tribology & Slapstick Ballistics</div>
+        </div>
+      </div>
+      
+      <div class="header-badges">
+        <div id="ai-status" class="badge-status loading">
+          <span class="status-dot"></span>
+          <span id="ai-status-text">Loading Neural Model...</span>
+        </div>
+        
+        <button id="sound-toggle" class="sound-toggle-btn" title="Toggle Sound FX">
+          🔊 Sound: ON
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main App Layout -->
+  <main class="app-layout">
+    
+    <!-- LEFT PANEL: INPUT & SCANNER -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span>🔬</span> Specimen Scanner
+        </h2>
+        <span class="panel-tag">AI GATEKEEPER ACTIVE</span>
+      </div>
+
+      <!-- Input Switch Tabs -->
+      <div class="input-tabs">
+        <button id="tab-upload" class="tab-btn active">
+          📁 Upload Image
+        </button>
+        <button id="tab-webcam" class="tab-btn">
+          📷 Live Camera
+        </button>
+      </div>
+
+      <!-- File Upload Zone -->
+      <div id="upload-zone" class="dropzone">
+        <input type="file" id="file-input" accept="image/*" style="display: none;" />
+        <div class="dropzone-icon">📥</div>
+        <div class="dropzone-text">Drop your Banana Image here</div>
+        <div class="dropzone-hint">or click to browse (.jpg, .png, .webp)</div>
+      </div>
+
+      <!-- Webcam Live Stream -->
+      <div id="camera-zone" class="camera-container">
+        <div class="video-wrapper">
+          <video id="webcam-video" autoplay playsinline muted></video>
+          <div class="scanner-reticle">
+            <div class="scanner-line"></div>
+          </div>
+        </div>
+        <div class="cam-controls">
+          <button id="btn-snap" class="btn btn-primary" style="flex: 2;">
+            📸 Snap & Analyze
+          </button>
+          <button id="btn-switch-cam" class="btn btn-secondary" style="flex: 1;">
+            🔄 Flip Cam
+          </button>
+        </div>
+      </div>
+
+      <!-- Preset Specimens for Quick Demo -->
+      <div class="presets-section">
+        <div class="presets-title">
+          <span>Quick Lab Samples</span>
+          <span>Click to Test</span>
+        </div>
+        <div class="preset-grid">
+          <div class="preset-chip" data-type="spotted" title="Spotted ripe banana - super slick!">
+            <span class="preset-emoji">🍌</span>
+            <div class="preset-name">Spotted Peel</div>
+          </div>
+          <div class="preset-chip" data-type="green" title="Green unripe banana - high friction">
+            <span class="preset-emoji">🍌</span>
+            <div class="preset-name">Unripe Green</div>
+          </div>
+          <div class="preset-chip" data-type="overripe" title="Black overripe banana - lethal gel breakdown">
+            <span class="preset-emoji">🍌</span>
+            <div class="preset-name">Biohazard Black</div>
+          </div>
+          <div class="preset-chip bad-preset" data-type="apple" title="Non-banana item - will be rejected!">
+            <span class="preset-emoji">🍎</span>
+            <div class="preset-name">Fake (Apple)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Specimen Inspection Window / Hidden Processor Canvas -->
+      <div class="preview-box">
+        <canvas id="preview-canvas" width="400" height="300"></canvas>
+        
+        <!-- Processing Spinner -->
+        <div id="scan-overlay" class="scan-status-overlay">
+          <div class="spinner"></div>
+          <div id="scan-message" style="font-size: 0.88rem; font-family: var(--font-mono); color: var(--banana-yellow);">
+            Inspecting Molecular Slickness...
+          </div>
+        </div>
+      </div>
+
+      <!-- Non-Banana Rejection Alert Banner -->
+      <div id="rejection-banner" class="rejection-banner">
+        <div class="rejection-header">
+          <span>⛔</span> SPECIMEN REJECTED BY AI GATEKEEPER
+        </div>
+        <div class="rejection-body">
+          Detected: <span id="detected-object" class="detected-tag">Non-Banana</span> (<span id="detected-prob">0%</span> confidence).<br>
+          <strong>Security Notice:</strong> The Slip-O-Meter Lab operates exclusively on bananas. Please submit a valid banana peel!
+        </div>
+      </div>
+    </section>
+
+
+    <!-- RIGHT PANEL: PREDICTIONS, SIMULATOR & PHYSICS -->
+    <section class="results-container">
+      
+      <!-- Panel Header -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <span>⚡</span> Slip Dynamics Prediction
+          </h2>
+          <span id="specimen-id-badge" class="panel-tag">AWAITING SPECIMEN</span>
+        </div>
+
+        <!-- FLOOR MATERIAL SELECTOR -->
+        <div class="floor-selector-box">
+          <div class="floor-selector-header">
+            <span class="floor-selector-title">
+              <span>🏟️</span> Floor Material & Substrate
+            </span>
+            <span id="floor-indicator-badge" class="floor-indicator-badge">POLISHED MARBLE ACTIVE</span>
+          </div>
+          <p class="floor-selector-subtitle">
+            Substrate micro-asperities and boundary mucilage dictate loss of traction, launch ballistics, and slide drag. Select a floor to calculate its metrics:
+          </p>
+          <div class="floor-grid" id="floor-selector-grid">
+            <button class="floor-chip active" data-floor="marble" type="button" title="Ultra smooth polished marble - high speed slip!">
+              <span class="floor-icon">🏛️</span>
+              <span class="floor-name">Polished Marble</span>
+              <span class="floor-badge">μ ≈ 0.05 • Slick</span>
+            </button>
+            <button class="floor-chip" data-floor="gravel" type="button" title="Rough loose stone aggregate - abrasive rolling drag">
+              <span class="floor-icon">🪨</span>
+              <span class="floor-name">Loose Gravel</span>
+              <span class="floor-badge">μ ≈ 0.65 • Abrasive</span>
+            </button>
+            <button class="floor-chip" data-floor="ice" type="button" title="Sub-zero frozen ice rink - frictionless hyper-drift">
+              <span class="floor-icon">🧊</span>
+              <span class="floor-name">Frozen Ice Rink</span>
+              <span class="floor-badge">μ ≈ 0.02 • Zero Drag</span>
+            </button>
+            <button class="floor-chip" data-floor="wettile" type="button" title="Wet supermarket tile - hydrodynamic aquaplane">
+              <span class="floor-icon">💧</span>
+              <span class="floor-name">Wet Tile</span>
+              <span class="floor-badge">μ ≈ 0.035 • Aquaplane</span>
+            </button>
+            <button class="floor-chip" data-floor="hardwood" type="button" title="Varnished parquet hardwood - classic living room slip">
+              <span class="floor-icon">🪵</span>
+              <span class="floor-name">Hardwood</span>
+              <span class="floor-badge">μ ≈ 0.18 • Parquet</span>
+            </button>
+            <button class="floor-chip" data-floor="asphalt" type="button" title="Rough street tarmac - high friction brake and sparks">
+              <span class="floor-icon">🛣️</span>
+              <span class="floor-name">Rough Asphalt</span>
+              <span class="floor-badge">μ ≈ 0.48 • Street Grit</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 Required Predictions Grid -->
+        <div class="metrics-grid">
+          
+          <!-- 1. SLIPPERY PERCENTAGE -->
+          <div class="metric-card">
+            <div class="metric-label">
+              <span>💦</span> 1. Slipperiness Index
+            </div>
+            <div class="metric-value-wrap">
+              <span id="val-slippery" class="metric-big">--</span>
+              <span class="metric-unit">%</span>
+            </div>
+            <div class="slip-gauge-box">
+              <div id="slip-gauge-fill" class="slip-gauge-fill"></div>
+            </div>
+            <div id="val-friction" class="metric-detail">
+              Coeff. of Friction (μ): --
+            </div>
+          </div>
+
+          <!-- 2. LAUNCH VELOCITY -->
+          <div class="metric-card cyan">
+            <div class="metric-label">
+              <span>🚀</span> 2. Launch Velocity
+            </div>
+            <div class="metric-value-wrap">
+              <span id="val-velocity" class="metric-big">--</span>
+              <span class="metric-unit">m/s</span>
+            </div>
+            <div id="val-velocity-kmh" class="metric-detail">
+              Slip Speed: -- km/h
+            </div>
+          </div>
+
+          <!-- 3. SLIDE DISTANCE -->
+          <div class="metric-card">
+            <div class="metric-label">
+              <span>📏</span> 3. Slide Distance
+            </div>
+            <div class="metric-value-wrap">
+              <span id="val-distance" class="metric-big">--</span>
+              <span class="metric-unit">m</span>
+            </div>
+            <div id="val-distance-feet" class="metric-detail">
+              Trajectory: -- ft
+            </div>
+          </div>
+
+        </div>
+
+        <!-- LETHALITY GRADING BANNER -->
+        <div id="lethality-banner" class="lethality-banner" style="margin-top: 16px;">
+          <div id="lethality-icon" class="lethality-icon">❓</div>
+          <div class="lethality-content">
+            <span id="lethality-tag" class="lethality-badge tag-mild">Standby</span>
+            <h3 id="lethality-title" class="lethality-title">Awaiting Banana Analysis</h3>
+            <p id="lethality-desc" class="lethality-desc">Upload or scan a banana to compute kinetic hazard & mortality prognosis.</p>
+          </div>
+        </div>
+
+        <!-- INTERACTIVE SLIP SIMULATOR CANVAS -->
+        <div class="sim-section" style="margin-top: 18px;">
+          <div class="sim-header">
+            <span style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+              <span>🎬</span> 2D Slapstick Physics Replay
+              <span id="sim-floor-tag" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--banana-yellow); background: rgba(250, 204, 21, 0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(250, 204, 21, 0.3);">🏛️ POLISHED MARBLE</span>
+            </span>
+            <button id="btn-replay" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.78rem;">
+              ▶️ Play Slip Replay
+            </button>
+          </div>
+          <div class="sim-canvas-wrapper">
+            <canvas id="sim-canvas" width="700" height="210"></canvas>
+            <div id="sim-hud" class="sim-overlay-hud">TRAJECTORY: READY</div>
+          </div>
+        </div>
+
+        <!-- SAVE TO LEADERBOARD CONTROLS -->
+        <div class="save-form">
+          <input type="text" id="banana-nickname" class="save-input" placeholder="Name this banana (e.g. Cavendish of Doom)" maxlength="32" />
+          <button id="btn-save-leaderboard" class="btn btn-primary">
+            🏆 Add to Leaderboard
+          </button>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- BOTTOM PANEL: HALL OF FAME LEADERBOARD -->
+    <section class="panel leaderboard-section">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span>🏆</span> Most Slippery Banana Peel Leaderboard
+        </h2>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-reset-leaderboard" class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;">
+            Reset Leaderboard
+          </button>
+        </div>
+      </div>
+
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+        Ranked in real-time by Slipperiness Percentage. The most treacherous, frictionless peels claim the crown!
+      </p>
+
+      <div class="leaderboard-table-wrapper">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Specimen</th>
+              <th>Floor Substrate</th>
+              <th>Slipperiness</th>
+              <th>Launch Velocity</th>
+              <th>Slide Distance</th>
+              <th>Lethality Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body">
+            <!-- Populated via JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="lab-footer">
+    <p>
+      🍌 <strong>Slip-O-Meter Laboratory</strong> &bull; Powered by TensorFlow.js MobileNet & Ig Nobel Physics Banana Tribology Research &bull;
+      <span>Strict Banana Verification System &bull; 100% Client-Side</span>
+    </p>
+  </footer>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    /* =========================================================================
+       1. GLOBAL STATE & CONSTANTS
+       ========================================================================= */
+    const state = {
+      model: null,
+      modelReady: false,
+      soundEnabled: true,
+      currentStream: null,
+      facingMode: 'environment',
+      activeTab: 'upload',
+      currentAnalysis: null,
+      currentFloor: 'marble',
+      rawPeelData: null,
+      currentThumb: null,
+      leaderboard: []
+    };
+
+    // FLOOR SUBSTRATE TRIBOLOGY MATRIX & DEFINITIONS
+    const FLOOR_MATERIALS = {
+      marble: {
+        id: 'marble',
+        name: 'Polished Marble',
+        icon: '🏛️',
+        baseMu: 0.25,
+        lubeFactor: 0.18,
+        launchMod: 1.15,
+        targetDistanceScale: 18,
+        frictionLabel: 'μ ≈ 0.045 • Slick Mirror',
+        sound: 'squeak',
+        title: 'Polished Marble',
+        animType: 'marble'
+      },
+      gravel: {
+        id: 'gravel',
+        name: 'Loose Gravel',
+        icon: '🪨',
+        baseMu: 0.85,
+        lubeFactor: 0.74,
+        launchMod: 0.45,
+        targetDistanceScale: 20,
+        frictionLabel: 'μ ≈ 0.65 • Abrasive Drag',
+        sound: 'crunch',
+        title: 'Loose Gravel',
+        animType: 'gravel'
+      },
+      ice: {
+        id: 'ice',
+        name: 'Frozen Ice Rink',
+        icon: '🧊',
+        baseMu: 0.05,
+        lubeFactor: 0.36,
+        launchMod: 1.35,
+        targetDistanceScale: 15,
+        frictionLabel: 'μ ≈ 0.018 • Zero Drag',
+        sound: 'scrape',
+        title: 'Frozen Ice Rink',
+        animType: 'ice'
+      },
+      wettile: {
+        id: 'wettile',
+        name: 'Wet Tile',
+        icon: '💧',
+        baseMu: 0.35,
+        lubeFactor: 0.10,
+        launchMod: 1.25,
+        targetDistanceScale: 16,
+        frictionLabel: 'μ ≈ 0.035 • Aquaplane',
+        sound: 'splash',
+        title: 'Wet Supermarket Tile',
+        animType: 'wettile'
+      },
+      hardwood: {
+        id: 'hardwood',
+        name: 'Hardwood',
+        icon: '🪵',
+        baseMu: 0.45,
+        lubeFactor: 0.40,
+        launchMod: 0.85,
+        targetDistanceScale: 18,
+        frictionLabel: 'μ ≈ 0.18 • Parquet',
+        sound: 'woodthud',
+        title: 'Varnished Hardwood',
+        animType: 'hardwood'
+      },
+      asphalt: {
+        id: 'asphalt',
+        name: 'Rough Asphalt',
+        icon: '🛣️',
+        baseMu: 0.75,
+        lubeFactor: 0.64,
+        launchMod: 0.58,
+        targetDistanceScale: 22,
+        frictionLabel: 'μ ≈ 0.48 • Street Grit',
+        sound: 'grind',
+        title: 'Rough Asphalt',
+        animType: 'asphalt'
+      }
+    };
+
+    // DOM Elements
+    const elAiStatus = document.getElementById('ai-status');
+    const elAiStatusText = document.getElementById('ai-status-text');
+    const elSoundToggle = document.getElementById('sound-toggle');
+    const elTabUpload = document.getElementById('tab-upload');
+    const elTabWebcam = document.getElementById('tab-webcam');
+    const elUploadZone = document.getElementById('upload-zone');
+    const elCameraZone = document.getElementById('camera-zone');
+    const elFileInput = document.getElementById('file-input');
+    const elWebcamVideo = document.getElementById('webcam-video');
+    const elBtnSnap = document.getElementById('btn-snap');
+    const elBtnSwitchCam = document.getElementById('btn-switch-cam');
+    const elPreviewCanvas = document.getElementById('preview-canvas');
+    const elScanOverlay = document.getElementById('scan-overlay');
+    const elScanMessage = document.getElementById('scan-message');
+    const elRejectionBanner = document.getElementById('rejection-banner');
+    const elDetectedObject = document.getElementById('detected-object');
+    const elDetectedProb = document.getElementById('detected-prob');
+    
+    // Result displays
+    const elValSlippery = document.getElementById('val-slippery');
+    const elSlipGaugeFill = document.getElementById('slip-gauge-fill');
+    const elValFriction = document.getElementById('val-friction');
+    const elValVelocity = document.getElementById('val-velocity');
+    const elValVelocityKmh = document.getElementById('val-velocity-kmh');
+    const elValDistance = document.getElementById('val-distance');
+    const elValDistanceFeet = document.getElementById('val-distance-feet');
+    const elLethalityBanner = document.getElementById('lethality-banner');
+    const elLethalityIcon = document.getElementById('lethality-icon');
+    const elLethalityTag = document.getElementById('lethality-tag');
+    const elLethalityTitle = document.getElementById('lethality-title');
+    const elLethalityDesc = document.getElementById('lethality-desc');
+    const elSpecimenIdBadge = document.getElementById('specimen-id-badge');
+
+    // Floor Selector Elements
+    const elFloorIndicatorBadge = document.getElementById('floor-indicator-badge');
+    const elSimFloorTag = document.getElementById('sim-floor-tag');
+
+    // Simulation elements
+    const elSimCanvas = document.getElementById('sim-canvas');
+    const elSimHud = document.getElementById('sim-hud');
+    const elBtnReplay = document.getElementById('btn-replay');
+
+    // Leaderboard elements
+    const elBananaNickname = document.getElementById('banana-nickname');
+    const elBtnSaveLeaderboard = document.getElementById('btn-save-leaderboard');
+    const elLeaderboardBody = document.getElementById('leaderboard-body');
+    const elBtnResetLeaderboard = document.getElementById('btn-reset-leaderboard');
+
+    /* =========================================================================
+       2. PROCEDURAL SOUND SYNTHESIS (Web Audio API)
+       ========================================================================= */
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSound(type) {
+      if (!state.soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+
+        if (type === 'scan') {
+          // Futuristic sweep
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.exponentialRampToValueAtTime(1400, now + 0.25);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'reject') {
+          // Buzzer sound
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(110, now);
+          osc.frequency.setValueAtTime(90, now + 0.15);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } else if (type === 'slip') {
+          // Slide whistle upward then downward
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(250, now);
+          osc.frequency.exponentialRampToValueAtTime(800, now + 0.18);
+          osc.frequency.exponentialRampToValueAtTime(180, now + 0.45);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.45);
+        } else if (type === 'thud') {
+          // Heavy comedic crash/thud
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(95, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'cheer') {
+          // Success high beep
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.1);
+          osc.frequency.setValueAtTime(783.99, now + 0.2);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } else if (type === 'squeak') {
+          // High squeak chirp on shiny marble/hardwood floor
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1200, now);
+          osc.frequency.exponentialRampToValueAtTime(2400, now + 0.08);
+          osc.frequency.exponentialRampToValueAtTime(900, now + 0.2);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.2);
+        } else if (type === 'crunch') {
+          // Gravel rock crunch noise burst
+          const bufferSize = Math.floor(ctx.sampleRate * 0.25);
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+          }
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(800, now);
+          filter.Q.setValueAtTime(1.8, now);
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          noise.start(now);
+        } else if (type === 'splash') {
+          // Wet tile water splash
+          const bufferSize = Math.floor(ctx.sampleRate * 0.3);
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.4));
+          }
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1800, now);
+          filter.frequency.exponentialRampToValueAtTime(350, now + 0.28);
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.32, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          noise.start(now);
+        } else if (type === 'scrape') {
+          // Frozen ice skate scrape
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc1.type = 'sawtooth';
+          osc2.type = 'sine';
+          osc1.frequency.setValueAtTime(850, now);
+          osc1.frequency.linearRampToValueAtTime(1400, now + 0.3);
+          osc2.frequency.setValueAtTime(880, now);
+          osc2.frequency.linearRampToValueAtTime(1430, now + 0.3);
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.35);
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 0.35);
+          osc2.stop(now + 0.35);
+        } else if (type === 'woodthud') {
+          // Hollow parquet thud
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.exponentialRampToValueAtTime(45, now + 0.22);
+          gain.gain.setValueAtTime(0.38, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'grind') {
+          // Harsh asphalt grind
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.exponentialRampToValueAtTime(70, now + 0.3);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        }
+      } catch (e) {
+        console.warn('Audio synthesis issue:', e);
+      }
+    }
+
+    elSoundToggle.addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      elSoundToggle.textContent = state.soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+      elSoundToggle.style.borderColor = state.soundEnabled ? 'var(--banana-yellow)' : 'var(--text-dim)';
+    });
+
+    /* =========================================================================
+       3. TENSORFLOW.JS MOBILENET INITIALIZATION (BANANA GATEKEEPER)
+       ========================================================================= */
+    async function loadClassifier() {
+      try {
+        elAiStatus.className = 'badge-status loading';
+        elAiStatusText.textContent = 'Loading MobileNet AI...';
+        
+        // Load MobileNet v2
+        state.model = await mobilenet.load({
+          version: 2,
+          alpha: 1.0
+        });
+        
+        state.modelReady = true;
+        elAiStatus.className = 'badge-status';
+        elAiStatusText.textContent = 'Neural Gatekeeper Active';
+      } catch (err) {
+        console.error('Failed to load MobileNet from CDN:', err);
+        // Set to fallback mode
+        state.modelReady = false;
+        elAiStatus.className = 'badge-status';
+        elAiStatus.style.background = 'rgba(6, 182, 212, 0.15)';
+        elAiStatus.style.borderColor = 'rgba(6, 182, 212, 0.4)';
+        elAiStatus.style.color = '#38bdf8';
+        elAiStatusText.textContent = 'Bio-Heuristic Gatekeeper Active';
+      }
+    }
+
+    /* =========================================================================
+       4. STRICT BANANA VERIFICATION ENGINE
+       ========================================================================= */
+    async function classifyImage(canvas) {
+      // 1. If MobileNet is ready, run inference
+      if (state.model) {
+        try {
+          const predictions = await state.model.classify(canvas, 5);
+          console.log('MobileNet predictions:', predictions);
+          
+          // Check if banana is in top predictions
+          // ImageNet class names: 'banana', 'plantain', or compound synonyms
+          const bananaMatch = predictions.find(p => {
+            const name = p.className.toLowerCase();
+            return name.includes('banana') || name.includes('plantain');
+          });
+
+          if (bananaMatch) {
+            return {
+              isBanana: true,
+              confidence: bananaMatch.probability,
+              label: bananaMatch.className
+            };
+          } else {
+            // Not a banana!
+            const topPrediction = predictions[0] || { className: 'Unknown Item', probability: 0.85 };
+            return {
+              isBanana: false,
+              confidence: topPrediction.probability,
+              label: topPrediction.className
+            };
+          }
+        } catch (e) {
+          console.warn('Inference error, evaluating via heuristic fallback', e);
+        }
+      }
+
+      // 2. Fallback Heuristic Classifier (color distribution & spectrum)
+      return evaluateBananaHeuristic(canvas);
+    }
+
+    // Heuristic fallback that examines yellow/green/brown ratio vs non-banana colors
+    function evaluateBananaHeuristic(canvas) {
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      
+      let bananaPixelCount = 0;
+      let nonBananaPixelCount = 0;
+      let totalCounted = 0;
+
+      for (let i = 0; i < imgData.length; i += 16) { // Sample every 4th pixel
+        const r = imgData[i];
+        const g = imgData[i + 1];
+        const b = imgData[i + 2];
+        const a = imgData[i + 3];
+
+        if (a < 30) continue; // transparent
+
+        // Check if color falls into banana spectrum:
+        // Yellow (R > 130, G > 110, B < 120, R/G ratio close to 1)
+        // Green unripe (G > R, G > B)
+        // Brown spots (R: 60-140, G: 30-100, B < 50)
+        const isYellow = (r > 130 && g > 110 && b < 120 && (r + g) > b * 2.2);
+        const isGreen = (g > r * 1.05 && g > b * 1.3);
+        const isSpottedBrown = (r > 60 && r < 140 && g > 30 && g < 100 && b < 50);
+
+        if (isYellow || isGreen || isSpottedBrown) {
+          bananaPixelCount++;
+        } else {
+          // Strong red (like an apple) or blue/purple (unnatural)
+          if ((r > 160 && g < 70 && b < 70) || (b > 150 && b > r * 1.4)) {
+            nonBananaPixelCount += 2;
+          } else {
+            nonBananaPixelCount++;
+          }
+        }
+        totalCounted++;
+      }
+
+      const ratio = totalCounted > 0 ? (bananaPixelCount / totalCounted) : 0;
+      if (ratio > 0.18) {
+        return {
+          isBanana: true,
+          confidence: Math.min(0.96, ratio * 2),
+          label: 'Banana (Heuristic Verified)'
+        };
+      } else {
+        return {
+          isBanana: false,
+          confidence: 0.88,
+          label: 'Non-Banana Object (Apple/Apparel/Object)'
+        };
+      }
+    }
+
+    /* =========================================================================
+       5. SLIPPERINESS & TRIBOLOGY CALCULATION ENGINE
+       ========================================================================= */
+    // Analyzes pixel pigmentation to extract raw peel ripeness and mucilage friction
+    function analyzeBananaTribology(canvas) {
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+      let yellowPixels = 0;
+      let greenPixels = 0;
+      let brownPixels = 0;
+      let totalBananaPixels = 0;
+
+      for (let i = 0; i < imgData.length; i += 8) {
+        const r = imgData[i];
+        const g = imgData[i + 1];
+        const b = imgData[i + 2];
+        const a = imgData[i + 3];
+
+        if (a < 30) continue;
+
+        // Spotting / Overripe Brown
+        if (r < 110 && g < 80 && b < 50 && (r > 35 || g > 25)) {
+          brownPixels++;
+          totalBananaPixels++;
+        }
+        // Green Unripe
+        else if (g > r * 1.02 && g > b * 1.2) {
+          greenPixels++;
+          totalBananaPixels++;
+        }
+        // Prime Yellow
+        else if (r > 140 && g > 120 && b < 120) {
+          yellowPixels++;
+          totalBananaPixels++;
+        }
+      }
+
+      if (totalBananaPixels === 0) {
+        totalBananaPixels = 100;
+        yellowPixels = 80;
+      }
+
+      const yellowRatio = yellowPixels / totalBananaPixels;
+      const greenRatio = greenPixels / totalBananaPixels;
+      const brownRatio = brownPixels / totalBananaPixels;
+
+      // Base peel friction: Ig Nobel findings (0.066 baseline)
+      let peelMu = 0.066;
+      peelMu += (greenRatio * 0.030);
+      peelMu -= (brownRatio * 0.032);
+      peelMu = Math.max(0.033, Math.min(0.095, peelMu));
+
+      let stage = 'Stage 5: Prime Slick Cavendish';
+      if (brownRatio > 0.3) {
+        stage = 'Stage 7: Biohazard Fermenting';
+      } else if (greenRatio > 0.3) {
+        stage = 'Stage 2: Unripe High-Traction Plantain';
+      }
+
+      return {
+        peelMu: Number(peelMu.toFixed(3)),
+        yellowRatio,
+        greenRatio,
+        brownRatio,
+        stage
+      };
+    }
+
+    // Couples peel mucilage with the selected floor substrate material
+    function calculateFloorPhysics(peelData, floorId) {
+      const floor = FLOOR_MATERIALS[floorId] || FLOOR_MATERIALS.marble;
+      const ripenessFactor = peelData.peelMu / 0.066; // <1 for overripe (slicker), >1 for green
+
+      // Coupled effective friction: substrate roughness coupled with boundary gel lubrication
+      let effectiveMu = floor.baseMu * floor.lubeFactor * ripenessFactor;
+
+      // Bound within realistic tribological boundaries per floor
+      if (floor.id === 'ice') effectiveMu = Math.max(0.013, Math.min(0.026, effectiveMu));
+      else if (floor.id === 'wettile') effectiveMu = Math.max(0.026, Math.min(0.048, effectiveMu));
+      else if (floor.id === 'marble') effectiveMu = Math.max(0.038, Math.min(0.065, effectiveMu));
+      else if (floor.id === 'hardwood') effectiveMu = Math.max(0.140, Math.min(0.230, effectiveMu));
+      else if (floor.id === 'asphalt') effectiveMu = Math.max(0.400, Math.min(0.560, effectiveMu));
+      else if (floor.id === 'gravel') effectiveMu = Math.max(0.550, Math.min(0.740, effectiveMu));
+
+      // 1. Slipperiness Index (%):
+      // Calibrated so Gravel is ~28-42%, Asphalt is ~46-58%, Hardwood is ~68-78%,
+      // Marble is ~89-95%, Wet Tile is ~93-98%, and Ice is ~97-99.8%.
+      const slipIndex = ((0.88 - effectiveMu) / (0.88 - 0.012)) * 100;
+      const slipperyPercent = Math.max(26.0, Math.min(99.8, slipIndex));
+
+      // 2. Launch Velocity (m/s):
+      // Heel shear force loss of traction accelerates foot forward inversely with sqrt(mu)
+      const rawKick = 1.4 * Math.sqrt(0.22 / Math.max(0.012, effectiveMu)) * floor.launchMod;
+      const launchVelocity = Math.max(1.8, Math.min(10.2, rawKick * (1 + (1 - ripenessFactor) * 0.15)));
+      const velocityKmh = launchVelocity * 3.6;
+
+      // 3. Slide Distance (m):
+      // In a real fall, sliding friction involves body clothing/skin over the floor substrate
+      // d = v^2 / (2 * mu_body * g)
+      const bodySlideMu = effectiveMu * 1.12;
+      const g = 9.81;
+      let slideDist = Math.pow(launchVelocity, 2) / (2 * bodySlideMu * g);
+
+      // Calibrate realistic physical boundaries:
+      if (floor.id === 'gravel') slideDist = Math.max(0.5, Math.min(1.2, slideDist * 0.28));
+      else if (floor.id === 'asphalt') slideDist = Math.max(1.2, Math.min(2.5, slideDist * 0.45));
+      else if (floor.id === 'hardwood') slideDist = Math.max(2.8, Math.min(5.2, slideDist * 0.72));
+      else if (floor.id === 'marble') slideDist = Math.max(6.5, Math.min(14.5, slideDist * 1.05));
+      else if (floor.id === 'wettile') slideDist = Math.max(8.5, Math.min(18.0, slideDist * 1.15));
+      else if (floor.id === 'ice') slideDist = Math.max(16.0, Math.min(32.0, slideDist * 1.35));
+
+      const distanceFeet = slideDist * 3.28084;
+
+      // Dynamic Lethality severity tailored to floor and kinetics
+      const lethality = getFloorLethality(floor, slipperyPercent, launchVelocity, slideDist);
+
+      return {
+        floorId: floor.id,
+        floorName: floor.name,
+        floorIcon: floor.icon,
+        slipperyPercent: Number(slipperyPercent.toFixed(1)),
+        effectiveMu: Number(effectiveMu.toFixed(3)),
+        peelMu: peelData.peelMu,
+        launchVelocity: Number(launchVelocity.toFixed(1)),
+        velocityKmh: Number(velocityKmh.toFixed(1)),
+        slideDistance: Number(slideDist.toFixed(1)),
+        distanceFeet: Number(distanceFeet.toFixed(1)),
+        lethality,
+        stage: peelData.stage,
+        sound: floor.sound
+      };
+    }
+
+    function getFloorLethality(floor, slipPct, velocity, distance) {
+      if (floor.id === 'gravel') {
+        return {
+          level: 'HAZARDOUS',
+          tagClass: 'tag-moderate',
+          icon: '🪨',
+          title: 'Grade 2: Gravel Road-Rash & Cartwheel Tumble',
+          desc: `Stones halted slide at ${distance.toFixed(1)}m. Severe elbow abrasions, torn trousers, and bruised dignity.`
+        };
+      } else if (floor.id === 'asphalt') {
+        return {
+          level: 'HAZARDOUS',
+          tagClass: 'tag-high',
+          icon: '🛣️',
+          title: 'Grade 2: Asphalt Friction Skid Burn',
+          desc: `Tarmac aggregate shredded denim across ${distance.toFixed(1)}m. Friction sparks and emergency knee braking.`
+        };
+      } else if (floor.id === 'hardwood') {
+        return {
+          level: 'CRITICAL',
+          tagClass: 'tag-high',
+          icon: '🪵',
+          title: 'Grade 3: Parquet Bowling Tailbone Slam',
+          desc: `Feet launched ceiling-ward at ${velocity.toFixed(1)} m/s! High-impact coccyx shockwave across ${distance.toFixed(1)}m living room floor.`
+        };
+      } else if (floor.id === 'marble') {
+        return {
+          level: slipPct > 92 ? 'TERMINAL' : 'CRITICAL',
+          tagClass: slipPct > 92 ? 'tag-deadly' : 'tag-high',
+          icon: '🏛️',
+          title: 'Grade 4: Zero-Friction Hallway Railgun',
+          desc: `Unchecked hydrodynamic glide across ${distance.toFixed(1)}m! High-speed 360° backflip spin into marble pillar.`
+        };
+      } else if (floor.id === 'wettile') {
+        return {
+          level: 'TERMINAL',
+          tagClass: 'tag-deadly',
+          icon: '💧',
+          title: 'Grade 4: Supermarket Penguin Hydroplane',
+          desc: `Aquaplaned ${distance.toFixed(1)}m on stomach at ${(velocity * 3.6).toFixed(0)} km/h! Smashed through cereal display.`
+        };
+      } else if (floor.id === 'ice') {
+        return {
+          level: 'TERMINAL',
+          tagClass: 'tag-deadly',
+          icon: '💀',
+          title: 'Grade 4: Sub-Zero Glacial Helicopter Yeet',
+          desc: `180° involuntary splits spinning across ${distance.toFixed(1)}m of frictionless ice! Lethal kinetic trajectory into arena boards.`
+        };
+      }
+      return {
+        level: 'MILD',
+        tagClass: 'tag-mild',
+        icon: '🩹',
+        title: 'Grade 1: Minor Contusion',
+        desc: 'Casualties: 1 Bruised Pride. 100% Survivable.'
+      };
+    }
+
+    /* =========================================================================
+       6. UI PRESENTATION & ANIMATIONS
+       ========================================================================= */
+    function displayAnalysisResults(analysis, thumbDataUrl, isFloorSwitch = false) {
+      state.currentAnalysis = {
+        ...analysis,
+        thumb: thumbDataUrl || state.currentThumb,
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      const startSlippery = isFloorSwitch ? parseFloat(elValSlippery.textContent) || 0 : 0;
+      const startVelocity = isFloorSwitch ? parseFloat(elValVelocity.textContent) || 0 : 0;
+      const startDistance = isFloorSwitch ? parseFloat(elValDistance.textContent) || 0 : 0;
+
+      // Animate percentage counter
+      animateCounter(elValSlippery, startSlippery, analysis.slipperyPercent, 700);
+      elSlipGaugeFill.style.width = analysis.slipperyPercent + '%';
+      elValFriction.textContent = `Coeff. of Friction: μ = ${analysis.effectiveMu} [${analysis.floorName}] (Peel: ${analysis.peelMu})`;
+
+      // Animate velocity
+      animateCounter(elValVelocity, startVelocity, analysis.launchVelocity, 700);
+      elValVelocityKmh.textContent = `Slip Speed: ${analysis.velocityKmh} km/h (${(analysis.velocityKmh * 0.621371).toFixed(1)} mph)`;
+
+      // Animate distance
+      animateCounter(elValDistance, startDistance, analysis.slideDistance, 700);
+      elValDistanceFeet.textContent = `Trajectory: ${analysis.distanceFeet} ft across ${analysis.floorName}`;
+
+      // Update Lethality Banner
+      elLethalityIcon.textContent = analysis.lethality.icon;
+      elLethalityTag.className = `lethality-badge ${analysis.lethality.tagClass}`;
+      elLethalityTag.textContent = analysis.lethality.level;
+      elLethalityTitle.textContent = analysis.lethality.title;
+      elLethalityDesc.textContent = analysis.lethality.desc;
+
+      // Update Badges
+      elSpecimenIdBadge.textContent = `ANALYSIS VERIFIED (${analysis.floorName.toUpperCase()})`;
+      if (elFloorIndicatorBadge) {
+        elFloorIndicatorBadge.textContent = `${analysis.floorName.toUpperCase()} ACTIVE`;
+      }
+      if (elSimFloorTag) {
+        elSimFloorTag.textContent = `${analysis.floorIcon} ${analysis.floorName.toUpperCase()}`;
+      }
+
+      // Trigger Simulation Replay with Floor Physics!
+      startSimulation(analysis);
+    }
+
+    function animateCounter(element, start, end, duration) {
+      const startTime = performance.now();
+      function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const current = (start + (end - start) * easeOutQuad(progress)).toFixed(1);
+        element.textContent = current;
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        } else {
+          element.textContent = end.toFixed(1);
+        }
+      }
+      requestAnimationFrame(update);
+    }
+
+    function easeOutQuad(t) {
+      return t * (2 - t);
+    }
+
+    // Floor Selector Interaction Listener
+    document.querySelectorAll('.floor-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const floorId = chip.getAttribute('data-floor');
+        if (!floorId || floorId === state.currentFloor) return;
+
+        state.currentFloor = floorId;
+
+        // Update active class on floor buttons
+        document.querySelectorAll('.floor-chip').forEach(c => {
+          c.classList.toggle('active', c.getAttribute('data-floor') === floorId);
+        });
+
+        const floorObj = FLOOR_MATERIALS[floorId];
+        if (elFloorIndicatorBadge && floorObj) {
+          elFloorIndicatorBadge.textContent = `${floorObj.name.toUpperCase()} ACTIVE`;
+        }
+        if (elSimFloorTag && floorObj) {
+          elSimFloorTag.textContent = `${floorObj.icon} ${floorObj.name.toUpperCase()}`;
+        }
+
+        // Recalculate immediately for the selected floor!
+        if (state.rawPeelData) {
+          const floorAnalysis = calculateFloorPhysics(state.rawPeelData, floorId);
+          displayAnalysisResults(floorAnalysis, state.currentThumb, true);
+          playSound(floorObj.sound || 'slip');
+        }
+      });
+    });
+
+    /* =========================================================================
+       7. 2D SLAPSTICK SLIP PHYSICS SIMULATOR (CANVAS)
+       ========================================================================= */
+    let simAnimId = null;
+
+    function startSimulation(analysis) {
+      if (simAnimId) cancelAnimationFrame(simAnimId);
+
+      const canvas = elSimCanvas;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      const floorY = 150;
+      const floorId = analysis.floorId || state.currentFloor || 'marble';
+
+      // Kinematic simulation variables
+      let runnerX = 35;
+      let runnerY = 120;
+      let runnerVx = 3.2;
+      let runnerVy = 0;
+      let runnerAngle = 0;
+      let simState = 'running'; // 'running', 'slipping', 'sliding', 'crashed'
+      const bananaX = 175;
+      let slideDistanceCovered = 0;
+      let spinRate = 0;
+      let dazeStars = 0;
+
+      // Target slide distance mapped to canvas pixels
+      // e.g. Gravel (0.8m) -> stops at ~220px; Ice (28m) -> slides to ~660px
+      let targetSlidePixels = bananaX + 25;
+      if (floorId === 'gravel') targetSlidePixels = bananaX + 35 + (analysis.slideDistance * 26);
+      else if (floorId === 'asphalt') targetSlidePixels = bananaX + 45 + (analysis.slideDistance * 36);
+      else if (floorId === 'hardwood') targetSlidePixels = bananaX + 50 + (analysis.slideDistance * 48);
+      else if (floorId === 'marble') targetSlidePixels = bananaX + 60 + (analysis.slideDistance * 38);
+      else if (floorId === 'wettile') targetSlidePixels = bananaX + 65 + (analysis.slideDistance * 32);
+      else if (floorId === 'ice') targetSlidePixels = bananaX + 70 + (analysis.slideDistance * 17);
+      targetSlidePixels = Math.min(w - 55, targetSlidePixels);
+
+      let particles = [];
+      let skidMarks = [];
+
+      playSound(analysis.sound || 'slip');
+
+      function addParticles(type, x, y, count = 10) {
+        for (let i = 0; i < count; i++) {
+          if (type === 'rocks') {
+            particles.push({
+              x: x + (Math.random() - 0.5) * 16,
+              y: y,
+              vx: (Math.random() - 0.4) * 9,
+              vy: -Math.random() * 7 - 2,
+              life: 1,
+              size: 3 + Math.random() * 4,
+              color: Math.random() > 0.5 ? '#a8a29e' : '#78716c',
+              type: 'rock'
+            });
+          } else if (type === 'dust') {
+            particles.push({
+              x: x,
+              y: y,
+              vx: (Math.random() - 0.5) * 4,
+              vy: -Math.random() * 3 - 1,
+              life: 1,
+              size: 8 + Math.random() * 12,
+              color: 'rgba(168, 162, 158, 0.4)',
+              type: 'dust'
+            });
+          } else if (type === 'sparks') {
+            particles.push({
+              x: x,
+              y: y,
+              vx: -(Math.random() * 8 + 2),
+              vy: -Math.random() * 5 - 1,
+              life: 1,
+              size: 2 + Math.random() * 2,
+              color: Math.random() > 0.5 ? '#facc15' : '#f97316',
+              type: 'spark'
+            });
+          } else if (type === 'smoke') {
+            particles.push({
+              x: x,
+              y: y,
+              vx: -(Math.random() * 3 + 1),
+              vy: -Math.random() * 2 - 1,
+              life: 1,
+              size: 6 + Math.random() * 8,
+              color: 'rgba(148, 163, 184, 0.4)',
+              type: 'dust'
+            });
+          } else if (type === 'water') {
+            particles.push({
+              x: x,
+              y: y,
+              vx: (Math.random() - 0.3) * 10,
+              vy: -Math.random() * 8 - 3,
+              life: 1,
+              size: 2.5 + Math.random() * 3,
+              color: Math.random() > 0.5 ? '#38bdf8' : '#7dd3fc',
+              type: 'water'
+            });
+          } else if (type === 'snow') {
+            particles.push({
+              x: x,
+              y: y,
+              vx: (Math.random() - 0.5) * 8,
+              vy: -Math.random() * 6 - 2,
+              life: 1,
+              size: 2 + Math.random() * 3,
+              color: '#ffffff',
+              type: 'snow'
+            });
+          } else if (type === 'gleam') {
+            particles.push({
+              x: x + (Math.random() - 0.5) * 30,
+              y: y - Math.random() * 25,
+              vx: (Math.random() - 0.5) * 2,
+              vy: -Math.random() * 3,
+              life: 1,
+              size: 3 + Math.random() * 3,
+              color: '#fef08a',
+              type: 'spark'
+            });
+          }
+        }
+      }
+
+      // Draw Environment & Floor Substrate
+      function drawFloorEnvironment() {
+        // Ceiling background
+        ctx.fillStyle = '#070b13';
+        ctx.fillRect(0, 0, w, floorY);
+
+        if (floorId === 'marble') {
+          // 1. POLISHED MARBLE: Glossy dark cyan/navy tiles with specular reflection
+          const grad = ctx.createLinearGradient(0, floorY, 0, h);
+          grad.addColorStop(0, '#0c1a2e');
+          grad.addColorStop(1, '#060d18');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, floorY, w, h - floorY);
+
+          // Grid tiles
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+          ctx.lineWidth = 1;
+          for (let tx = 0; tx < w; tx += 60) {
+            ctx.strokeRect(tx, floorY, 60, h - floorY);
+          }
+
+          // Specular sheen diagonal
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+          ctx.beginPath();
+          ctx.moveTo(100, floorY);
+          ctx.lineTo(260, floorY);
+          ctx.lineTo(160, h);
+          ctx.lineTo(0, h);
+          ctx.fill();
+
+          // Floor top line (gold-blue reflection)
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(0, floorY);
+          ctx.lineTo(w, floorY);
+          ctx.stroke();
+
+        } else if (floorId === 'gravel') {
+          // 2. LOOSE GRAVEL: Rugged brown/grey earth with loose pebble aggregate
+          ctx.fillStyle = '#1c1917';
+          ctx.fillRect(0, floorY, w, h - floorY);
+
+          // Pebbles on surface
+          const pebbleColors = ['#78716c', '#a8a29e', '#d6d3d1', '#57534e', '#44403c'];
+          for (let px = 5; px < w; px += 14) {
+            const py = floorY + 2 + Math.sin(px * 1.5) * 3;
+            ctx.fillStyle = pebbleColors[(px * 7) % pebbleColors.length];
+            ctx.beginPath();
+            ctx.ellipse(px, py, 4, 2.5, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Top rugged edge
+          ctx.strokeStyle = '#78716c';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(0, floorY);
+          ctx.lineTo(w, floorY);
+          ctx.stroke();
+
+        } else if (floorId === 'ice') {
+          // 3. FROZEN ICE RINK: Icy cyan gradient with skate scratches and hockey lines
+          const iceGrad = ctx.createLinearGradient(0, floorY, 0, h);
+          iceGrad.addColorStop(0, '#0284c7');
+          iceGrad.addColorStop(0.3, '#38bdf8');
+          iceGrad.addColorStop(1, '#bae6fd');
+          ctx.fillStyle = iceGrad;
+          ctx.fillRect(0, floorY, w, h - floorY);
+
+          // Red goal / blue center line
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(140, floorY); ctx.lineTo(140, h);
+          ctx.stroke();
+          ctx.strokeStyle = 'rgba(30, 64, 175, 0.4)';
+          ctx.beginPath();
+          ctx.moveTo(380, floorY); ctx.lineTo(380, h);
+          ctx.stroke();
+
+          // Skate scratch marks
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = 1.2;
+          for (let sx = 20; sx < w; sx += 80) {
+            ctx.beginPath();
+            ctx.arc(sx, floorY + 15, 30, 0.1, 0.8);
+            ctx.stroke();
+          }
+
+          // Top bright ice sheen
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(0, floorY);
+          ctx.lineTo(w, floorY);
+          ctx.stroke();
+
+        } else if (floorId === 'wettile') {
+          // 4. WET TILE: Supermarket ceramic tile with water puddle reflections
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(0, floorY, w, h - floorY);
+
+          // Ceramic grid
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+          ctx.lineWidth = 1;
+          for (let tx = 0; tx < w; tx += 45) {
+            ctx.strokeRect(tx, floorY, 45, h - floorY);
+          }
+
+          // Water puddle patches
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+          ctx.beginPath();
+          ctx.ellipse(280, floorY + 14, 70, 10, 0, 0, Math.PI * 2);
+          ctx.ellipse(500, floorY + 18, 90, 12, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Caution wet floor cone at x = 110
+          ctx.fillStyle = '#eab308';
+          ctx.beginPath();
+          ctx.moveTo(110, floorY);
+          ctx.lineTo(120, floorY - 24);
+          ctx.lineTo(130, floorY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#000';
+          ctx.font = '8px sans-serif';
+          ctx.fillText('⚠️', 116, floorY - 6);
+
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, floorY);
+          ctx.lineTo(w, floorY);
+          ctx.stroke();
+
+        } else if (floorId === 'hardwood') {
+          // 5. VARNISHED HARDWOOD: Honey-oak parquet planks
+          const woodGrad = ctx.createLinearGradient(0, floorY, 0, h);
+          woodGrad.addColorStop(0, '#78350f');
+          woodGrad.addColorStop(0.5, '#92400e');
+          woodGrad.addColorStop(1, '#451a03');
+          ctx.fillStyle = woodGrad;
+          ctx.fillRect(0, floorY, w, h - floorY);
+
+          // Parquet seams & wood grains
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.lineWidth = 1.5;
+          for (let wx = 0; wx < w; wx += 70) {
+            ctx.beginPath();
+            ctx.moveTo(wx, floorY);
+            ctx.lineTo(wx, h);
+            ctx.stroke();
+            // Subtle wood plank grain
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.08)';
+            ctx.beginPath();
+            ctx.moveTo(wx + 15, floorY);
+            ctx.lineTo(wx + 15, h);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+          }
+
+          // Top polished rim
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(0, floorY);
+          ctx.lineTo(w, floorY);
+          ctx.stroke();
+
+        } else if (floorId === 'asphalt') {
+          // 6. ROUGH ASPHALT: Dark tarmac pavement with yellow road dashes
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(0, floorY, w, h - floorY);
+
+          // Asphalt speckles
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+          for (let ax = 0; ax < w; ax += 12) {
+            ctx.fillRect(ax, floorY + ((ax * 13) % 40) + 5, 2, 2);
+          }
+
+          // Yellow center dashes
+          ctx.fillStyle = '#facc15';
+          for (let dx = 30; dx < w; dx += 90) {
+            ctx.fillRect(dx, floorY + 24, 45, 4);
+          }
+
+          // Top asphalt edge
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(0, floorY);
+          ctx.lineTo(w, floorY);
+          ctx.stroke();
+        }
+
+        // Distance grid markers
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.font = '9px monospace';
+        for (let x = 40; x < w; x += 60) {
+          ctx.fillText(`${((x - bananaX) / 25).toFixed(1)}m`, x - 10, floorY + 16);
+        }
+
+        // Render persistent skid marks
+        skidMarks.forEach(sm => {
+          ctx.fillStyle = sm.color;
+          ctx.fillRect(sm.x, sm.y, sm.w, sm.h);
+        });
+      }
+
+      // Draw Stickman character
+      function drawStickman(context, stateMode, floorType, isReflection = false) {
+        context.strokeStyle = stateMode === 'crashed' ? '#ef4444' : (stateMode === 'slipping' ? '#facc15' : '#f8fafc');
+        context.lineWidth = 3.5;
+        context.lineCap = 'round';
+
+        // Head
+        context.beginPath();
+        context.arc(0, -22, 9, 0, Math.PI * 2);
+        context.fillStyle = stateMode === 'crashed' ? '#fca5a5' : '#fef08a';
+        context.fill();
+        context.stroke();
+
+        // Face / Eyes
+        if (!isReflection) {
+          context.fillStyle = '#000';
+          if (stateMode === 'crashed') {
+            context.font = '9px sans-serif';
+            context.fillText('X X', -6, -20);
+          } else if (stateMode === 'slipping' || stateMode === 'sliding') {
+            context.font = '9px sans-serif';
+            context.fillText(floorType === 'ice' ? '@ @' : 'o o', -6, -20);
+          }
+        }
+
+        // Torso
+        context.beginPath();
+        context.moveTo(0, -13);
+        context.lineTo(0, 8);
+        context.stroke();
+
+        // Arms
+        context.beginPath();
+        if (stateMode === 'running') {
+          context.moveTo(-10, -5);
+          context.lineTo(10, -5);
+        } else if (stateMode === 'slipping') {
+          // Panic flailing upwards
+          context.moveTo(-14, -18);
+          context.lineTo(0, -8);
+          context.lineTo(14, -18);
+        } else if (stateMode === 'sliding') {
+          if (floorType === 'wettile') {
+            // Penguin arms spread back like flippers
+            context.moveTo(-16, -2);
+            context.lineTo(0, -6);
+            context.lineTo(-16, 12);
+          } else if (floorType === 'ice') {
+            // Helicopter windmill arms
+            context.moveTo(-18, -12);
+            context.lineTo(0, -6);
+            context.lineTo(18, 8);
+          } else {
+            // Classic comic flail
+            context.moveTo(-12, -15);
+            context.lineTo(0, -8);
+            context.lineTo(12, -15);
+          }
+        } else {
+          // Crashed pose arms
+          context.moveTo(-8, 6);
+          context.lineTo(0, -2);
+          context.lineTo(8, 6);
+        }
+        context.stroke();
+
+        // Legs
+        context.beginPath();
+        if (stateMode === 'running') {
+          const legSwing = Math.sin(runnerX * 0.15) * 12;
+          context.moveTo(0, 8); context.lineTo(-legSwing, 25);
+          context.moveTo(0, 8); context.lineTo(legSwing, 25);
+        } else if (stateMode === 'slipping') {
+          if (floorType === 'ice') {
+            // Full 180° splits!
+            context.moveTo(0, 8); context.lineTo(-24, 8);
+            context.moveTo(0, 8); context.lineTo(24, 8);
+          } else {
+            // Feet kicked skyward
+            context.moveTo(0, 8); context.lineTo(15, -6);
+            context.moveTo(0, 8); context.lineTo(20, -2);
+          }
+        } else if (stateMode === 'sliding') {
+          if (floorType === 'ice') {
+            // Involuntary splits spinning!
+            context.moveTo(0, 8); context.lineTo(-24, 8);
+            context.moveTo(0, 8); context.lineTo(24, 8);
+          } else if (floorType === 'wettile') {
+            // Belly-flop toboggan legs trailing back
+            context.moveTo(0, 8); context.lineTo(-18, 4);
+            context.moveTo(0, 8); context.lineTo(-22, 10);
+          } else {
+            // Sliding on back/butt
+            context.moveTo(0, 8); context.lineTo(-16, 14);
+            context.moveTo(0, 8); context.lineTo(16, 14);
+          }
+        } else {
+          // Crashed legs
+          if (floorType === 'gravel') {
+            // Crumpled upside-down legs sticking into air
+            context.moveTo(0, 8); context.lineTo(-12, -14);
+            context.moveTo(0, 8); context.lineTo(14, -16);
+          } else {
+            context.moveTo(0, 8); context.lineTo(-18, 12);
+            context.moveTo(0, 8); context.lineTo(18, 12);
+          }
+        }
+        context.stroke();
+      }
+
+      function renderFrame() {
+        ctx.clearRect(0, 0, w, h);
+
+        // 1. Draw floor environment & substrate
+        drawFloorEnvironment();
+
+        // 2. Draw Banana on Floor
+        ctx.save();
+        ctx.translate(bananaX, floorY - 3);
+        ctx.font = '22px sans-serif';
+        ctx.fillText('🍌', -11, 0);
+        ctx.restore();
+
+        // 3. Physics State Progression
+        if (simState === 'running') {
+          runnerX += runnerVx;
+          runnerY = floorY - 30 + Math.sin(runnerX * 0.18) * 4;
+          elSimHud.textContent = `[${analysis.floorName.toUpperCase()}] APPROACH: 1.4 m/s | SLIP TARGET: ${analysis.slipperyPercent}%`;
+
+          // Foot steps on banana peel!
+          if (runnerX >= bananaX - 8) {
+            simState = 'slipping';
+            playSound(analysis.sound || 'slip');
+
+            // Unique launch kinematics per floor
+            if (floorId === 'marble') {
+              runnerVx = analysis.launchVelocity * 0.55;
+              runnerVy = -8.5; // high backflip airtime
+              spinRate = 0.28;
+              addParticles('gleam', runnerX, floorY, 14);
+            } else if (floorId === 'gravel') {
+              runnerVx = analysis.launchVelocity * 0.42;
+              runnerVy = -4.0; // low forward stumble
+              spinRate = 0.38; // clumsy forward cartwheel
+              addParticles('rocks', runnerX, floorY, 18);
+              addParticles('dust', runnerX, floorY, 8);
+            } else if (floorId === 'ice') {
+              runnerVx = analysis.launchVelocity * 0.65;
+              runnerVy = -6.5;
+              spinRate = 0.35; // helicopter spin
+              addParticles('snow', runnerX, floorY, 20);
+            } else if (floorId === 'wettile') {
+              runnerVx = analysis.launchVelocity * 0.58;
+              runnerVy = -9.2; // rocket leap into belly-flop
+              spinRate = 0.16;
+              addParticles('water', runnerX, floorY, 24);
+            } else if (floorId === 'hardwood') {
+              runnerVx = analysis.launchVelocity * 0.48;
+              runnerVy = -7.5;
+              spinRate = 0.22;
+              addParticles('sparks', runnerX, floorY, 8);
+            } else if (floorId === 'asphalt') {
+              runnerVx = analysis.launchVelocity * 0.46;
+              runnerVy = -5.0; // low diving trip
+              spinRate = 0.24;
+              addParticles('sparks', runnerX, floorY, 16);
+              addParticles('smoke', runnerX, floorY, 6);
+            }
+          }
+
+        } else if (simState === 'slipping') {
+          runnerX += runnerVx;
+          runnerY += runnerVy;
+          runnerVy += 0.48; // gravity
+          runnerAngle += spinRate;
+
+          elSimHud.textContent = `[${analysis.floorName.toUpperCase()}] LAUNCH VELOCITY: ${analysis.velocityKmh} km/h (${analysis.launchVelocity} m/s) | AIRTIME!`;
+
+          // Hit ground
+          if (runnerY >= floorY - 26) {
+            runnerY = floorY - 26;
+            simState = 'sliding';
+            playSound('thud');
+
+            if (floorId === 'gravel') {
+              addParticles('rocks', runnerX, floorY, 20);
+              addParticles('dust', runnerX, floorY, 12);
+            } else if (floorId === 'wettile') {
+              addParticles('water', runnerX, floorY, 26);
+              playSound('splash');
+            } else if (floorId === 'asphalt') {
+              addParticles('sparks', runnerX, floorY, 16);
+              addParticles('smoke', runnerX, floorY, 8);
+              playSound('grind');
+            } else if (floorId === 'ice') {
+              addParticles('snow', runnerX, floorY, 15);
+              playSound('scrape');
+            } else if (floorId === 'hardwood') {
+              playSound('woodthud');
+            } else if (floorId === 'marble') {
+              playSound('squeak');
+            }
+          }
+
+        } else if (simState === 'sliding') {
+          runnerX += runnerVx;
+          slideDistanceCovered += runnerVx;
+
+          // Material-specific friction decay rate:
+          // Gravel decelerates rapidly; Ice glides almost effortlessly!
+          if (floorId === 'gravel') runnerVx *= 0.88;
+          else if (floorId === 'asphalt') runnerVx *= 0.93;
+          else if (floorId === 'hardwood') runnerVx *= 0.965;
+          else if (floorId === 'marble') runnerVx *= 0.985;
+          else if (floorId === 'wettile') runnerVx *= 0.988;
+          else if (floorId === 'ice') runnerVx *= 0.994;
+
+          // Floor-specific slide pose rotation
+          if (floorId === 'marble') {
+            runnerAngle += 0.22; // 360° spinning top glide!
+            addParticles('gleam', runnerX, floorY, 1);
+          } else if (floorId === 'ice') {
+            runnerAngle += 0.26; // propeller spin in splits!
+            addParticles('snow', runnerX, floorY, 2);
+          } else if (floorId === 'asphalt') {
+            runnerAngle = 0.25; // low knee drag
+            addParticles('sparks', runnerX, floorY, 2);
+            addParticles('smoke', runnerX, floorY, 1);
+            skidMarks.push({ x: runnerX - 4, y: floorY - 2, w: 6, h: 2, color: 'rgba(0, 0, 0, 0.4)' });
+          } else if (floorId === 'hardwood') {
+            runnerAngle = Math.PI * 0.45; // on butt
+            skidMarks.push({ x: runnerX - 4, y: floorY - 2, w: 6, h: 2, color: 'rgba(69, 26, 3, 0.5)' });
+          } else if (floorId === 'wettile') {
+            runnerAngle = 0.05; // penguin stomach hydroplane
+            addParticles('water', runnerX, floorY, 3);
+          } else if (floorId === 'gravel') {
+            runnerAngle = Math.PI * 0.9; // crumpled forward tumble
+            addParticles('dust', runnerX, floorY, 2);
+          }
+
+          const currentCoveredMeters = (slideDistanceCovered / (targetSlidePixels - bananaX)) * analysis.slideDistance;
+          elSimHud.textContent = `[${analysis.floorName.toUpperCase()}] KINETIC SLIDE: ${Math.min(analysis.slideDistance, currentCoveredMeters).toFixed(1)}m / ${analysis.slideDistance}m`;
+
+          // Stop threshold reached
+          if (runnerX >= targetSlidePixels || runnerVx < 0.2) {
+            simState = 'crashed';
+            dazeStars = 0;
+            elSimHud.textContent = `HALTED: ${analysis.slideDistance}m SLIDE | ${analysis.lethality.title.toUpperCase()}`;
+          }
+        }
+
+        // 4. Draw Inverted Mirror Reflection on Polished Marble
+        if (floorId === 'marble' && runnerY >= floorY - 45) {
+          ctx.save();
+          ctx.translate(runnerX, floorY + (floorY - runnerY) * 0.5);
+          ctx.scale(1, -0.45);
+          ctx.rotate(-runnerAngle);
+          ctx.globalAlpha = 0.22;
+          drawStickman(ctx, simState, floorId, true);
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        }
+
+        // 5. Draw Stickman Figure
+        ctx.save();
+        ctx.translate(runnerX, runnerY);
+        ctx.rotate(runnerAngle);
+        drawStickman(ctx, simState, floorId, false);
+        ctx.restore();
+
+        // 6. Draw Orbiting Dizzy Stars when Crashed
+        if (simState === 'crashed') {
+          dazeStars += 0.08;
+          ctx.font = '12px sans-serif';
+          const star1X = runnerX + Math.cos(dazeStars) * 18;
+          const star1Y = runnerY - 32 + Math.sin(dazeStars) * 6;
+          const star2X = runnerX + Math.cos(dazeStars + Math.PI) * 18;
+          const star2Y = runnerY - 32 + Math.sin(dazeStars + Math.PI) * 6;
+          ctx.fillText('⭐', star1X, star1Y);
+          ctx.fillText('✨', star2X, star2Y);
+        }
+
+        // 7. Update & Draw Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.type === 'rock' ? 0.35 : (p.type === 'water' ? 0.25 : 0.1);
+          p.life -= 0.035;
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+
+          if (p.type === 'rock') {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (p.type === 'dust') {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+          }
+          ctx.restore();
+
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        if (simState !== 'crashed') {
+          simAnimId = requestAnimationFrame(renderFrame);
+        }
+      }
+
+      simAnimId = requestAnimationFrame(renderFrame);
+    }
+
+    elBtnReplay.addEventListener('click', () => {
+      if (state.currentAnalysis) {
+        startSimulation(state.currentAnalysis);
+      }
+    });
+
+    /* =========================================================================
+       8. IMAGE INGESTION & PIPELINE (FILE & WEBCAM)
+       ========================================================================= */
+    async function processSpecimenImage(sourceImage) {
+      // Show scan overlay
+      elScanOverlay.style.display = 'flex';
+      elRejectionBanner.style.display = 'none';
+      playSound('scan');
+
+      // Draw onto analysis canvas
+      const canvas = elPreviewCanvas;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Maintain aspect ratio
+      const hRatio = canvas.width / sourceImage.width;
+      const vRatio = canvas.height / sourceImage.height;
+      const ratio = Math.min(hRatio, vRatio);
+      const centerShiftX = (canvas.width - sourceImage.width * ratio) / 2;
+      const centerShiftY = (canvas.height - sourceImage.height * ratio) / 2;
+
+      ctx.drawImage(
+        sourceImage,
+        0, 0, sourceImage.width, sourceImage.height,
+        centerShiftX, centerShiftY, sourceImage.width * ratio, sourceImage.height * ratio
+      );
+
+      elScanMessage.textContent = 'Verifying Banana Taxonomy...';
+
+      // Step 1: AI Gatekeeper Inspection
+      const classification = await classifyImage(canvas);
+      console.log('Gatekeeper Decision:', classification);
+
+      if (!classification.isBanana) {
+        // REJECT! NOT A BANANA!
+        setTimeout(() => {
+          elScanOverlay.style.display = 'none';
+          elRejectionBanner.style.display = 'block';
+          elDetectedObject.textContent = classification.label;
+          elDetectedProb.textContent = `${Math.round(classification.confidence * 100)}%`;
+          playSound('reject');
+
+          // Reset displays
+          elValSlippery.textContent = '0.0';
+          elSlipGaugeFill.style.width = '0%';
+          elValVelocity.textContent = '0.0';
+          elValDistance.textContent = '0.0';
+          elLethalityTitle.textContent = 'Non-Banana Object Detected';
+          elLethalityDesc.textContent = 'Analysis halted: Friction metrics only apply to authentic banana peels.';
+          elLethalityTag.className = 'lethality-badge tag-deadly';
+          elLethalityTag.textContent = 'REJECTED';
+          elSpecimenIdBadge.textContent = 'REJECTED: NOT A BANANA';
+        }, 400);
+        return;
+      }
+
+      // Step 2: Banana Confirmed! Compute Tribology & Floor Ballistics
+      elScanMessage.textContent = 'Calculating Peel Mucilage Tribology...';
+      
+      setTimeout(() => {
+        const rawPeelData = analyzeBananaTribology(canvas);
+        state.rawPeelData = rawPeelData;
+        const thumbUrl = canvas.toDataURL('image/jpeg', 0.6);
+        state.currentThumb = thumbUrl;
+
+        // Compute physics for the currently selected floor
+        const floorAnalysis = calculateFloorPhysics(rawPeelData, state.currentFloor);
+        elScanOverlay.style.display = 'none';
+        displayAnalysisResults(floorAnalysis, thumbUrl, false);
+        playSound('cheer');
+      }, 500);
+    }
+
+    // File Input Handlers
+    elUploadZone.addEventListener('click', () => elFileInput.click());
+    
+    elUploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      elUploadZone.classList.add('drag-over');
+    });
+
+    elUploadZone.addEventListener('dragleave', () => {
+      elUploadZone.classList.remove('drag-over');
+    });
+
+    elUploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      elUploadZone.classList.remove('drag-over');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        loadFromFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    elFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        loadFromFile(e.target.files[0]);
+      }
+    });
+
+    function loadFromFile(file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please upload an image file (.jpg, .png, .webp)');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => processSpecimenImage(img);
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Tabs switching
+    elTabUpload.addEventListener('click', () => {
+      state.activeTab = 'upload';
+      elTabUpload.classList.add('active');
+      elTabWebcam.classList.remove('active');
+      elUploadZone.style.display = 'block';
+      elCameraZone.style.display = 'none';
+      stopCamera();
+    });
+
+    elTabWebcam.addEventListener('click', () => {
+      state.activeTab = 'webcam';
+      elTabWebcam.classList.add('active');
+      elTabUpload.classList.remove('active');
+      elUploadZone.style.display = 'none';
+      elCameraZone.style.display = 'flex';
+      startCamera();
+    });
+
+    // Webcam Management
+    async function startCamera() {
+      try {
+        stopCamera();
+        const constraints = {
+          video: {
+            facingMode: state.facingMode,
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        };
+        state.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        elWebcamVideo.srcObject = state.currentStream;
+      } catch (err) {
+        console.error('Camera access error:', err);
+        alert('Could not access camera. Please allow camera permissions in your browser or use File Upload.');
+      }
+    }
+
+    function stopCamera() {
+      if (state.currentStream) {
+        state.currentStream.getTracks().forEach(track => track.stop());
+        state.currentStream = null;
+      }
+    }
+
+    elBtnSwitchCam.addEventListener('click', () => {
+      state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+      startCamera();
+    });
+
+    elBtnSnap.addEventListener('click', () => {
+      if (!state.currentStream) return;
+      const snapCanvas = document.createElement('canvas');
+      snapCanvas.width = elWebcamVideo.videoWidth || 640;
+      snapCanvas.height = elWebcamVideo.videoHeight || 480;
+      const snapCtx = snapCanvas.getContext('2d');
+      snapCtx.drawImage(elWebcamVideo, 0, 0, snapCanvas.width, snapCanvas.height);
+
+      const img = new Image();
+      img.onload = () => processSpecimenImage(img);
+      img.src = snapCanvas.toDataURL('image/jpeg');
+    });
+
+    /* =========================================================================
+       9. PRESET TEST SPECIMENS (GENERATED ON CANVAS)
+       ========================================================================= */
+    function generatePresetImage(type) {
+      const c = document.createElement('canvas');
+      c.width = 400;
+      c.height = 300;
+      const ctx = c.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      if (type === 'apple') {
+        // Non-Banana Test Image: Red Delicious Apple
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(200, 160, 75, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Apple stem & leaf
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(200, 90);
+        ctx.lineTo(205, 60);
+        ctx.stroke();
+
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.ellipse(220, 68, 18, 9, Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Draw Curved Banana Body
+        ctx.save();
+        ctx.translate(200, 150);
+        ctx.rotate(-0.25);
+
+        let mainColor = '#facc15';
+        let tipColor = '#4ade80';
+
+        if (type === 'green') {
+          mainColor = '#65a30d';
+          tipColor = '#166534';
+        } else if (type === 'overripe') {
+          mainColor = '#451a03';
+          tipColor = '#1e1b4b';
+        }
+
+        // Banana curved path
+        ctx.beginPath();
+        ctx.moveTo(-110, -20);
+        ctx.bezierCurveTo(-40, 75, 60, 75, 120, -30);
+        ctx.bezierCurveTo(70, 30, -30, 30, -110, -20);
+        ctx.fillStyle = mainColor;
+        ctx.fill();
+
+        // Tips
+        ctx.fillStyle = tipColor;
+        ctx.beginPath();
+        ctx.arc(-110, -20, 7, 0, Math.PI * 2);
+        ctx.arc(120, -30, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // If spotted banana, add brown freckles
+        if (type === 'spotted') {
+          ctx.fillStyle = '#78350f';
+          const spots = [
+            [-50, 15], [-20, 35], [10, 38], [40, 32], [70, 15],
+            [-30, 22], [0, 26], [30, 20], [-70, 0], [90, -10]
+          ];
+          spots.forEach(([sx, sy]) => {
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, 4 + Math.random() * 4, 3, Math.random(), 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+
+        ctx.restore();
+      }
+
+      const img = new Image();
+      img.onload = () => processSpecimenImage(img);
+      img.src = c.toDataURL('image/jpeg');
+    }
+
+    document.querySelectorAll('.preset-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const type = chip.getAttribute('data-type');
+        generatePresetImage(type);
+      });
+    });
+
+    /* =========================================================================
+       10. HALL OF FAME LEADERBOARD (PERSISTENT LOCALSTORAGE)
+       ========================================================================= */
+    const STORAGE_KEY = 'banana_slip_lab_leaderboard_v2';
+
+    const DEFAULT_LEADERBOARD = [
+      {
+        id: '1',
+        name: 'Overripe Cavendish Biohazard #007',
+        floorId: 'ice',
+        floorName: 'Frozen Ice Rink',
+        floorIcon: '🧊',
+        slipperyPercent: 99.4,
+        launchVelocity: 9.4,
+        slideDistance: 28.5,
+        lethality: { level: 'TERMINAL', tagClass: 'tag-deadly' },
+        date: '10:45 AM'
+      },
+      {
+        id: '2',
+        name: 'Mario Kart Track Vintage 1992',
+        floorId: 'marble',
+        floorName: 'Polished Marble',
+        floorIcon: '🏛️',
+        slipperyPercent: 94.8,
+        launchVelocity: 7.8,
+        slideDistance: 13.6,
+        lethality: { level: 'TERMINAL', tagClass: 'tag-deadly' },
+        date: '09:20 AM'
+      },
+      {
+        id: '3',
+        name: 'Ig Nobel Prize Research Specimen #4',
+        floorId: 'wettile',
+        floorName: 'Wet Tile',
+        floorIcon: '💧',
+        slipperyPercent: 93.2,
+        launchVelocity: 7.1,
+        slideDistance: 11.8,
+        lethality: { level: 'CRITICAL', tagClass: 'tag-high' },
+        date: 'Yesterday'
+      },
+      {
+        id: '4',
+        name: 'Supermarket Chiquita Standard',
+        floorId: 'hardwood',
+        floorName: 'Hardwood',
+        floorIcon: '🪵',
+        slipperyPercent: 74.5,
+        launchVelocity: 4.8,
+        slideDistance: 4.2,
+        lethality: { level: 'CRITICAL', tagClass: 'tag-high' },
+        date: '2 days ago'
+      },
+      {
+        id: '5',
+        name: 'Sidewalk Plantain Skid',
+        floorId: 'asphalt',
+        floorName: 'Rough Asphalt',
+        floorIcon: '🛣️',
+        slipperyPercent: 52.0,
+        launchVelocity: 3.2,
+        slideDistance: 1.9,
+        lethality: { level: 'HAZARDOUS', tagClass: 'tag-moderate' },
+        date: '3 days ago'
+      },
+      {
+        id: '6',
+        name: 'Loose Gravel Trail Peel',
+        floorId: 'gravel',
+        floorName: 'Loose Gravel',
+        floorIcon: '🪨',
+        slipperyPercent: 36.4,
+        launchVelocity: 2.3,
+        slideDistance: 0.8,
+        lethality: { level: 'HAZARDOUS', tagClass: 'tag-moderate' },
+        date: '4 days ago'
+      }
+    ];
+
+    function loadLeaderboard() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          state.leaderboard = JSON.parse(stored);
+        } else {
+          state.leaderboard = [...DEFAULT_LEADERBOARD];
+          saveLeaderboardToStorage();
+        }
+      } catch (e) {
+        state.leaderboard = [...DEFAULT_LEADERBOARD];
+      }
+      renderLeaderboard();
+    }
+
+    function saveLeaderboardToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.leaderboard));
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
+      }
+    }
+
+    function renderLeaderboard() {
+      // Sort by Slippery Percentage descending
+      state.leaderboard.sort((a, b) => b.slipperyPercent - a.slipperyPercent);
+
+      elLeaderboardBody.innerHTML = '';
+
+      if (state.leaderboard.length === 0) {
+        elLeaderboardBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 24px;">No bananas on the leaderboard yet! Analyze and add your specimen above.</td></tr>`;
+        return;
+      }
+
+      state.leaderboard.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        
+        let rankBadge = `#${index + 1}`;
+        if (index === 0) rankBadge = '🥇 #1';
+        else if (index === 1) rankBadge = '🥈 #2';
+        else if (index === 2) rankBadge = '🥉 #3';
+
+        const rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
+
+        const thumbHtml = item.thumb 
+          ? `<img src="${item.thumb}" class="banana-thumb" alt="thumb" />` 
+          : `<span class="banana-thumb" style="display:inline-flex;align-items:center;justify-content:center;font-size:1.3rem;">🍌</span>`;
+
+        const floorIcon = item.floorIcon || '🏛️';
+        const floorName = item.floorName || 'Polished Marble';
+
+        tr.innerHTML = `
+          <td class="rank-cell ${rankClass}">${rankBadge}</td>
+          <td>
+            <div style="display: flex; align-items: center;">
+              ${thumbHtml}
+              <div>
+                <span class="banana-name-cell">${escapeHtml(item.name)}</span>
+                <span class="banana-date">${item.date || 'Today'}</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="floor-tag-small">
+              <span>${floorIcon}</span>
+              <span>${floorName}</span>
+            </span>
+          </td>
+          <td><span class="slip-pill">${item.slipperyPercent}%</span></td>
+          <td><span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">${item.launchVelocity} m/s</span></td>
+          <td><span style="font-family: var(--font-mono); font-weight: 700; color: #fff;">${item.slideDistance} m</span></td>
+          <td><span class="lethality-tag-small ${item.lethality.tagClass}">${item.lethality.level}</span></td>
+          <td>
+            <button class="delete-btn" onclick="removeLeaderboardItem('${item.id}')" title="Delete entry">🗑️</button>
+          </td>
+        `;
+
+        elLeaderboardBody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    window.removeLeaderboardItem = function(id) {
+      state.leaderboard = state.leaderboard.filter(item => item.id !== id);
+      saveLeaderboardToStorage();
+      renderLeaderboard();
+    };
+
+    elBtnSaveLeaderboard.addEventListener('click', () => {
+      if (!state.currentAnalysis) {
+        alert('Please scan or upload a banana first before saving to the leaderboard!');
+        return;
+      }
+
+      const nickname = elBananaNickname.value.trim() || `Specimen #${Math.floor(100 + Math.random() * 900)}`;
+      
+      const newEntry = {
+        id: Date.now().toString(),
+        name: nickname,
+        floorId: state.currentAnalysis.floorId || state.currentFloor,
+        floorName: state.currentAnalysis.floorName || 'Polished Marble',
+        floorIcon: state.currentAnalysis.floorIcon || '🏛️',
+        slipperyPercent: state.currentAnalysis.slipperyPercent,
+        launchVelocity: state.currentAnalysis.launchVelocity,
+        slideDistance: state.currentAnalysis.slideDistance,
+        lethality: state.currentAnalysis.lethality,
+        thumb: state.currentAnalysis.thumb,
+        date: state.currentAnalysis.date
+      };
+
+      state.leaderboard.push(newEntry);
+      saveLeaderboardToStorage();
+      renderLeaderboard();
+      playSound('cheer');
+
+      elBananaNickname.value = '';
+      elBtnSaveLeaderboard.textContent = '✅ Saved!';
+      setTimeout(() => {
+        elBtnSaveLeaderboard.textContent = '🏆 Add to Leaderboard';
+      }, 1500);
+    });
+
+    elBtnResetLeaderboard.addEventListener('click', () => {
+      if (confirm('Reset leaderboard to default hall of fame specimens?')) {
+        state.leaderboard = [...DEFAULT_LEADERBOARD];
+        saveLeaderboardToStorage();
+        renderLeaderboard();
+      }
+    });
+
+    /* =========================================================================
+       11. INIT APP ON LOAD
+       ========================================================================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      loadClassifier();
+      loadLeaderboard();
+      // Load first preset image to display an active state right away!
+      generatePresetImage('spotted');
+    });
+  </script>
+</body>
+</html>
