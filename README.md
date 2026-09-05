@@ -2,60 +2,37 @@
 
 
 
-# [Project Name] 🎯
+# [BEWARE IT'S SLIPPERY ] 🎯
 
 
 ## Basic Details
-### Team Name: [Name]
+### Team Name: [HYDRA]
 
 
 ### Team Members
-- Team Lead: [Name] - [College]
-- Member 2: [Name] - [College]
-- Member 3: [Name] - [College]
+- Team Lead: [Gautham krishna B] - [Jain University Kochi]
+- Member 2: [Aadith sherif] - [Jain University Kochi]
 
 ### Project Description
-[2-3 lines about what your project does]
+[Our project analyses banana peel and predicts its slipperiness ]
 
 ### The Problem (that doesn't exist)
-[What ridiculous problem are you solving?]
+[The problem of not knowing how much slipper a banana peel is]
 
 ### The Solution (that nobody asked for)
-[How are you solving it? Keep it fun!]
+[we analyze banana through image and predicts how much slippery, and dangerous it is]
 
 ## Technical Details
 ### Technologies/Components Used
 For Software:
-- [Languages used]
-- [Frameworks used]
-- [Libraries used]
-- [Tools used]
+- [HTML]
+- [Antigravity]
 
-For Hardware:
-- [List main components]
-- [List specifications]
-- [List tools required]
 
-### Implementation
-For Software:
-# Installation
-[commands]
-
-# Run
-[commands]
-
-### Project Documentation
-For Software:
 
 # Screenshots (Add at least 3)
-![Screenshot1](Add screenshot 1 here with proper name)
-*Add caption explaining what this shows*
+<img width="1313" height="567" alt="image" src="https://github.com/user-attachments/assets/264ebdce-7bf0-4607-80e1-ab153a34a629" />
 
-![Screenshot2](Add screenshot 2 here with proper name)
-*Add caption explaining what this shows*
-
-![Screenshot3](Add screenshot 3 here with proper name)
-*Add caption explaining what this shows*
 
 # Diagrams
 ![Workflow](Add your workflow/architecture diagram here)
@@ -85,13 +62,9 @@ For Hardware:
 [Add your demo video link here]
 *Explain what the video demonstrates*
 
-# Additional Demos
-[Add any extra demo materials/links]
-
 ## Team Contributions
-- [Name 1]: [Specific contributions]
-- [Name 2]: [Specific contributions]
-- [Name 3]: [Specific contributions]
+- [Gautham]: [HTML codding]
+- [Aadith]: [Presentation and devolepment]
 
 ---
 Made with ❤️ at TinkerHub Useless Projects 
