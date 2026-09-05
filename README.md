@@ -59,8 +59,8 @@ For Hardware:
 
 ### Project Demo
 # Video
-[Add your demo video link here]
-*Explain what the video demonstrates*
+
+https://github.com/gxaii/useless_project_hydra/blob/main/banana%20peel.mp4
 
 ## Team Contributions
 - [Gautham]: [HTML codding]
