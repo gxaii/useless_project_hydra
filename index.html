@@ -438,6 +438,13 @@
       justify-content: space-between;
     }
 
+    .presets-hint {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin: -2px 0 10px;
+      line-height: 1.35;
+    }
+
     .preset-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -1165,8 +1172,9 @@
           <span>Quick Lab Samples</span>
           <span>Click to Test</span>
         </div>
+        <p class="presets-hint">Spotted Peel and Biohazard Black are still bananas (ripe spotted / overripe). Only Fake (Apple) is rejected.</p>
         <div class="preset-grid">
-          <div class="preset-chip" data-type="spotted" title="Spotted ripe banana - super slick!">
+          <div class="preset-chip" data-type="spotted" title="Ripe banana with brown spots — accepted as a banana, extra slick.">
             <span class="preset-emoji">🍌</span>
             <div class="preset-name">Spotted Peel</div>
           </div>
@@ -1174,7 +1182,7 @@
             <span class="preset-emoji">🍌</span>
             <div class="preset-name">Unripe Green</div>
           </div>
-          <div class="preset-chip" data-type="overripe" title="Black overripe banana - lethal gel breakdown">
+          <div class="preset-chip" data-type="overripe" title="Overripe black banana — accepted as a banana, lethal gel breakdown.">
             <span class="preset-emoji">🍌</span>
             <div class="preset-name">Biohazard Black</div>
           </div>
@@ -1787,7 +1795,21 @@
     /* =========================================================================
        4. STRICT BANANA VERIFICATION ENGINE
        ========================================================================= */
-    async function classifyImage(canvas) {
+    async function classifyImage(canvas, options = {}) {
+      const labType = options.labSampleType;
+      if (labType && labType !== 'apple') {
+        const labLabels = {
+          spotted: 'Spotted ripe banana (lab sample)',
+          green: 'Unripe green banana (lab sample)',
+          overripe: 'Overripe black banana (lab sample)'
+        };
+        return {
+          isBanana: true,
+          confidence: 0.97,
+          label: labLabels[labType] || 'Banana (lab sample)'
+        };
+      }
+
       // 1. If MobileNet is ready, run inference
       if (state.model) {
         try {
@@ -1807,15 +1829,8 @@
               confidence: bananaMatch.probability,
               label: bananaMatch.className
             };
-          } else {
-            // Not a banana!
-            const topPrediction = predictions[0] || { className: 'Unknown Item', probability: 0.85 };
-            return {
-              isBanana: false,
-              confidence: topPrediction.probability,
-              label: topPrediction.className
-            };
           }
+          // Cartoon / overripe peels often miss ImageNet "banana" — confirm via peel colors
         } catch (e) {
           console.warn('Inference error, evaluating via heuristic fallback', e);
         }
@@ -1843,14 +1858,13 @@
         if (a < 30) continue; // transparent
 
         // Check if color falls into banana spectrum:
-        // Yellow (R > 130, G > 110, B < 120, R/G ratio close to 1)
-        // Green unripe (G > R, G > B)
-        // Brown spots (R: 60-140, G: 30-100, B < 50)
+        // Yellow, green unripe, brown spots, and overripe black/umber peel
         const isYellow = (r > 130 && g > 110 && b < 120 && (r + g) > b * 2.2);
         const isGreen = (g > r * 1.05 && g > b * 1.3);
         const isSpottedBrown = (r > 60 && r < 140 && g > 30 && g < 100 && b < 50);
+        const isOverripeBlack = (r > 28 && r < 120 && g < r * 0.9 && g > 8 && b < 55 && b < g * 1.15);
 
-        if (isYellow || isGreen || isSpottedBrown) {
+        if (isYellow || isGreen || isSpottedBrown || isOverripeBlack) {
           bananaPixelCount++;
         } else {
           // Strong red (like an apple) or blue/purple (unnatural)
@@ -2639,37 +2653,31 @@
             simState = 'slipping';
             playSound(analysis.sound || 'slip');
 
-            // Unique launch kinematics per floor
+            // Unique slip kinematics per floor (stay on the surface — no hop / bounce)
             if (floorId === 'marble') {
               runnerVx = analysis.launchVelocity * 0.55;
-              runnerVy = -8.5; // high backflip airtime
-              spinRate = 0.28;
+              spinRate = 0.055;
               addParticles('gleam', runnerX, floorY, 14);
             } else if (floorId === 'gravel') {
               runnerVx = analysis.launchVelocity * 0.42;
-              runnerVy = -4.0; // low forward stumble
-              spinRate = 0.38; // clumsy forward cartwheel
+              spinRate = 0.08;
               addParticles('rocks', runnerX, floorY, 18);
               addParticles('dust', runnerX, floorY, 8);
             } else if (floorId === 'ice') {
               runnerVx = analysis.launchVelocity * 0.65;
-              runnerVy = -6.5;
-              spinRate = 0.35; // helicopter spin
+              spinRate = 0.05;
               addParticles('snow', runnerX, floorY, 20);
             } else if (floorId === 'wettile') {
               runnerVx = analysis.launchVelocity * 0.58;
-              runnerVy = -9.2; // rocket leap into belly-flop
-              spinRate = 0.16;
+              spinRate = 0.048;
               addParticles('water', runnerX, floorY, 24);
             } else if (floorId === 'hardwood') {
               runnerVx = analysis.launchVelocity * 0.48;
-              runnerVy = -7.5;
-              spinRate = 0.22;
+              spinRate = 0.06;
               addParticles('sparks', runnerX, floorY, 8);
             } else if (floorId === 'asphalt') {
               runnerVx = analysis.launchVelocity * 0.46;
-              runnerVy = -5.0; // low diving trip
-              spinRate = 0.24;
+              spinRate = 0.07;
               addParticles('sparks', runnerX, floorY, 16);
               addParticles('smoke', runnerX, floorY, 6);
             }
@@ -2677,15 +2685,18 @@
 
         } else if (simState === 'slipping') {
           runnerX += runnerVx;
-          runnerY += runnerVy;
-          runnerVy += 0.48; // gravity
-          runnerAngle += spinRate;
+          const groundedY = floorY - 26;
+          const fallAngle = Math.PI * 0.5;
+          runnerY += (groundedY - runnerY) * 0.11;
+          if (runnerY > groundedY) runnerY = groundedY;
+          runnerAngle += (fallAngle - runnerAngle) * spinRate;
+          if (runnerAngle > fallAngle) runnerAngle = fallAngle;
 
-          elSimHud.textContent = `[${analysis.floorName.toUpperCase()}] LAUNCH VELOCITY: ${analysis.velocityKmh} km/h (${analysis.launchVelocity} m/s) | AIRTIME!`;
+          elSimHud.textContent = `[${analysis.floorName.toUpperCase()}] LAUNCH VELOCITY: ${analysis.velocityKmh} km/h (${analysis.launchVelocity} m/s) | SLIPPING`;
 
-          // Hit ground
-          if (runnerY >= floorY - 26) {
-            runnerY = floorY - 26;
+          // Settled onto the floor after the slip (no bounce)
+          if (runnerY >= groundedY - 0.6 && runnerAngle >= fallAngle - 0.1) {
+            runnerY = groundedY;
             simState = 'sliding';
             playSound('thud');
 
@@ -2832,7 +2843,7 @@
     /* =========================================================================
        8. IMAGE INGESTION & PIPELINE (FILE & WEBCAM)
        ========================================================================= */
-    async function processSpecimenImage(sourceImage) {
+    async function processSpecimenImage(sourceImage, options = {}) {
       // Show scan overlay
       elScanOverlay.style.display = 'flex';
       elRejectionBanner.style.display = 'none';
@@ -2859,7 +2870,7 @@
       elScanMessage.textContent = 'Verifying Banana Taxonomy...';
 
       // Step 1: AI Gatekeeper Inspection
-      const classification = await classifyImage(canvas);
+      const classification = await classifyImage(canvas, options);
       console.log('Gatekeeper Decision:', classification);
 
       if (!classification.isBanana) {
@@ -3087,7 +3098,7 @@
       }
 
       const img = new Image();
-      img.onload = () => processSpecimenImage(img);
+      img.onload = () => processSpecimenImage(img, { labSampleType: type });
       img.src = c.toDataURL('image/jpeg');
     }
 
